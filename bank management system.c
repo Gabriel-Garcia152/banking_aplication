@@ -1,17 +1,20 @@
-#include <stdio.h>
 #include <locale.h>
+#include <stdbool.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdbool.h>
 #include <unistd.h>
 
-#define MAX_ACCOUNTS 100
-
-//***main structures**//
+//***main structures and global variables***//
 
 struct Login {
     int account_code;
     bool logged_in;
+};
+
+struct Transactions {
+    char type; //'W' will stand for 'withdraws' and 'D' for 'deposits'
+    float value;
 };
 
 struct Account {
@@ -19,18 +22,18 @@ struct Account {
     int age;
     float balance;
     bool active;
+    struct Transactions* history;
+    int history_capacity;
 };
 
 struct Login log_status;
-struct Account accounts[MAX_ACCOUNTS];
-bool run = true;
-int num_accounts = 0;
+struct Account* accounts;
+int num_accounts = 0, last_transaction = 0;
 
-//***general porpose function***//
+#define MAX_HISTORY_ENTRIES 10
+#define MAX_ACCOUNTS 1
 
-void clear_terminal() {
-    printf("\033[H\033[2J");
-}
+//***general purpose function***//
 
 int print_account(int account_code) {
     printf("\n\n*************************************\n\n");
@@ -54,7 +57,6 @@ void print_main_menu() {
 }
 
 void print_update_menu() {
-    printf("\n");
     printf("Qual informação você deseja atualizar?\n");
     printf("[1] - Nome\n");
     printf("[2] - Sobrenome\n");
@@ -62,27 +64,47 @@ void print_update_menu() {
     printf("\n");
 }
 
+
+int check_int(const char *message, const char *error_message) {
+    int var;
+    while (true) {
+        printf("%s", message);
+        if (scanf("%i", &var) != 1) {
+            printf("%s\n", error_message);
+            while (getchar() != '\n'); // Clear input buffer
+        } else {
+            while (getchar() != '\n'); // Clear input buffer
+            return var;
+        }
+    }
+}
+
+
 void exiting() {
     printf("Deseja voltar ao menu principal?\n");
     printf("Digite [1] para voltar ao menu ou [2] para fechar o programa:\n");
     
     int exit_confirmation;
-    unsigned int sleepDuration = 1;
     
     do {
         scanf("%i", &exit_confirmation);
         switch (exit_confirmation) {
             case 1:
-                clear_terminal();
+                system("clear");
                 printf("Voltando ao menu principal...\n\n");
-                sleep(sleepDuration);
-                clear_terminal();
+                sleep(1);
+                system("clear");
                 return;
                 break;
             case 2:
-                clear_terminal();
+                system("clear");
                 printf("Fechando o programa...");
-                run = false;
+                
+                for (int i = 0; i < num_accounts; i++) {
+                    free(accounts[i].history);
+                }
+                free(accounts);
+                
                 exit(0);
                 return;
                 break;
@@ -93,19 +115,46 @@ void exiting() {
     } while (exit_confirmation != 1 && exit_confirmation != 2);
 }
 
+void resize_history(struct Account* account) {
+    int new_size = MAX_HISTORY_ENTRIES * 2;
+    
+    struct Transactions* new_history = (struct Transactions*)realloc(account->history, new_size * sizeof(struct Transactions));
+    if (new_history == NULL) {
+        printf("Erro: Falha na realocação de memória para o histórico de transações.\n");
+    } else {
+        account -> history = new_history;
+        account -> history_capacity = new_size;
+    }
+}
+
 //***main menu functions***//
 
 int create_account(void) {
     float balance = 0.0;
     
-    clear_terminal();
-
+    accounts[num_accounts].history = NULL;
+    accounts[num_accounts].history = (struct Transactions*)malloc(MAX_HISTORY_ENTRIES * sizeof(struct Transactions));
+    if (accounts[num_accounts].history == NULL) {
+        printf("Erro: Falha na alocação de memória para contas.\n");
+        exit(1);
+    }
+    
     printf ("Digite seu nome: ");
-    scanf ("%s", accounts[num_accounts].name);
+    getchar();
+    fgets (accounts[num_accounts].name, sizeof(accounts[num_accounts].name), stdin);
     printf ("Digite seu sobrenome: ");
-    scanf ("%s", accounts[num_accounts].last_name);
-    printf ("Digite sua Idade: ");
-    scanf ("%i", &accounts[num_accounts].age);
+    fgets (accounts[num_accounts].last_name, sizeof(accounts[num_accounts].last_name), stdin);
+    accounts[num_accounts].age = check_int("Digite sua idade: ", "Idade inválida. Por favor, digite um valor numérico e inteiro.");
+    
+    size_t len_name = strlen(accounts[num_accounts].name);
+    if (len_name > 0 && accounts[num_accounts].name[len_name - 1] == '\n') {
+        accounts[num_accounts].name[len_name - 1] = '\0';
+    }
+    
+    size_t len_last_name = strlen(accounts[num_accounts].last_name);
+    if (len_last_name > 0 && accounts[num_accounts].last_name[len_last_name - 1] == '\n') {
+        accounts[num_accounts].last_name[len_last_name - 1] = '\0';
+    }
     
     if (accounts[num_accounts].age >= 18) {
         printf ("Crie uma senha: ");
@@ -125,8 +174,10 @@ int create_account(void) {
         }
         
         accounts[num_accounts].active = true;
+        accounts[num_accounts].history_capacity = MAX_HISTORY_ENTRIES;
+        accounts[num_accounts].balance = balance;
         
-        clear_terminal();
+        system("clear");
         printf("Conta criada com sucesso!");
         print_account(num_accounts);
         
@@ -138,7 +189,7 @@ int create_account(void) {
         return 1;
         
     } else {
-        clear_terminal();
+        system("clear");
         printf ("Você precisa ser maior de idade para criar uma conta.\n");
         printf ("Voltando para o menu principal...\n\n");
         return 0;
@@ -148,8 +199,6 @@ int create_account(void) {
 
 void update_info(void) {
     int account_code, option;
-    
-    clear_terminal();
     
     while (true) {
         printf("Digite o código da sua conta: ");
@@ -170,24 +219,35 @@ void update_info(void) {
                 
                 while(true) {
                     
-                    scanf("%i", &option);
+                    option = check_int("Sua opção: ", "Opção inválida. Por favor, digite um valor numérico.");
                     
                     switch (option) {
                         case 1:
+                            getchar();
                             printf("Qual nome você deseja colocar em sua conta?\n");
-                            char name[100];
-                            scanf("%s", name);
-                            strcpy(accounts[account_code].name, name);
+                            fgets (accounts[account_code].name, sizeof(accounts[account_code].name), stdin);
                             printf("Nome alterado com sucesso!");
+                            
+                            size_t len = strlen(accounts[account_code].name);
+                            if (len > 0 && accounts[account_code].name[len - 1] == '\n') {
+                                accounts[account_code].name[len - 1] = '\0';
+                            }
+                            
                             exiting();
                             return;
                             break;
                         case 2:
                             printf("Qual sobrenome você deseja colocar em sua conta?\n");
                             char last_name[100];
-                            scanf("%s", last_name);
-                            strcpy(accounts[account_code].last_name, last_name);
+                            getchar();
+                            fgets (accounts[account_code].last_name, sizeof(accounts[account_code].last_name), stdin);
                             printf("Sobrenome alterado com sucesso!");
+                            
+                            size_t len_last_name = strlen(accounts[account_code].last_name);
+                            if (len_last_name > 0 && accounts[account_code].last_name[len_last_name - 1] == '\n') {
+                                accounts[account_code].last_name[len_last_name - 1] = '\0';
+                            }
+                            
                             exiting();
                             return;
                             break;
@@ -215,16 +275,13 @@ void update_info(void) {
 bool account_access(void) {
     int account_code, attempts = 0;
     
-    clear_terminal();
-    
-    printf("Digite o código de sua conta: ");
     while (true) {
-        scanf("%i", &account_code);
+        account_code = check_int("Digite o código de sua conta: ", "Código incorreto, por favor, digite um valor numérico");
         
-        clear_terminal();
+        system("clear");
         
-        if (account_code < 0 || account_code > num_accounts) {
-            printf("Conta não encontrada, por favor, tente novamente.");
+        if (account_code < 0 || account_code >= num_accounts) {
+            printf("Conta não encontrada, por favor, tente novamente.\n");
             continue;
         }
         
@@ -246,7 +303,7 @@ bool account_access(void) {
                         
                     } else {
                         attempts++;
-                        clear_terminal();
+                        system("clear");
                         printf("Acesso negado. Senha incompátivel.\n");
                         printf("Tentativas feitas %i\n", attempts);
                         printf("Tente novamente: ");
@@ -254,8 +311,8 @@ bool account_access(void) {
                     }
                 } while(attempts < 3);
                 
-                clear_terminal();
-                printf("Você excedeu o número de tentativas.\n");
+                system("clear");
+                printf("Você excedeu o número máximo de tentativas de login.\n");
                 printf("Voltanto ao menu principal...\n\n");
                 return false;
             
@@ -278,10 +335,25 @@ bool account_access(void) {
 }
 
 
-bool delete_account(void) {
-    int account_code, option, attempts = 0;
+void account_history() {
+    int size = MAX_HISTORY_ENTRIES;
     
-    clear_terminal();
+    for(int i = 0; i < size; i++) {
+        printf("%i - ", i);
+        if (accounts[log_status.account_code].history[i].type == 'W') {
+            printf("Saque de %.2f\n", accounts[log_status.account_code].history[i].value);
+        } else if (accounts[log_status.account_code].history[i].type == 'D') {
+            printf("Depósito de %.2f\n", accounts[log_status.account_code].history[i].value);
+        }
+    }
+    printf("\n\n");
+    exiting();
+    return;
+}
+
+
+bool delete_account(void) {
+    int account_code, option, attempts = 0;;
     
     printf("Por favor, digite o número da conta que deseja excluir.\n");
     printf("Número da conta: ");
@@ -295,28 +367,33 @@ bool delete_account(void) {
             
             do {
                 printf("Digite [1] para 'sim' ou [2] para 'não'\n");
-                scanf("%i", &option);
+                option = check_int("Sua opção: ", "Opção inválida. Por favor, digite um valor numérico.");
                 
                 if(option == 1) {
                     
-                    clear_terminal();
+                    system("clear");
                     printf("Para confirmar a exclusão, for favor, digite sua senha: ");
                     
                     do {
                         char *validation = getpass("");
                         
                         if(strcmp(validation, accounts[account_code].password) == 0) {
+                            attempts = 0;
                             accounts[account_code].active = false;
                             
-                            clear_terminal();
+                            system("clear");
                             printf("Conta excluída com sucesso!\n\n");
                             log_status.logged_in = false;
+                            
+                            free(accounts[account_code].history);
+                            accounts[account_code].history = NULL;
+                            
                             exiting();
                             return true;
                         } else {
                             
                                 attempts++;
-                                clear_terminal();
+                                system("clear");
                                 printf("Acesso negado. Senha incompátivel.\n");
                                 printf("Tentativas feitas %i\n", attempts);
                                 printf("Tente novamente: ");
@@ -324,13 +401,13 @@ bool delete_account(void) {
                         }
                     } while(attempts < 3);
                     
-                    clear_terminal();
+                    system("clear");
                     printf("Você excedeu o número de tentativas.\n");
                     printf("Voltanto ao menu principal...\n\n");
                     return false;
                     
                 } else if(option == 2) {
-                    clear_terminal();
+                    system("clear");
                     printf("Exclusão não confirmada, retornando ao menu principal.\n\n");
                     return false;
                     
@@ -356,22 +433,28 @@ int money_move(void) {
     int option;
     float value;
     
-    clear_terminal();
+    if (last_transaction >= MAX_HISTORY_ENTRIES) {
+        // Resize the history array to accommodate more transactions
+        resize_history(&accounts[log_status.account_code]);
+    }
     
     printf("Selecione um tipo de movimentação.\n");
     do {
         printf("Digite [1] para saques e [2] para depósitos.\n");
-        scanf("%i", &option);
+        option = check_int("Sua opção: ", "Opção inválida. Por favor, digite um valor numérico.");
         switch (option) {
             case 1:
                 printf("\n");
-                printf("Qual valor você deseja retirar?\n");
+                printf("Qual valor você deseja retirar?\nR$ ");
                 scanf("%f", &value);
                 if (value <= accounts[log_status.account_code].balance && value > 0) {
                     accounts[log_status.account_code].balance -= value;
                     
                     printf("\n");
-                    printf("%.2f retirado da sua conta, saldo atual: R$ %.2f\n", value, accounts[log_status.account_code].balance);
+                    printf("%.2f retirado da sua conta, saldo atual: R$ %.2f\n\n", value, accounts[log_status.account_code].balance);
+                    accounts[log_status.account_code].history[last_transaction].type = 'W';
+                    accounts[log_status.account_code].history[last_transaction].value = value;
+                    last_transaction += 1;
                     exiting();
                     return 1;
                     
@@ -392,8 +475,11 @@ int money_move(void) {
                 if (value > 0) {
                     accounts[log_status.account_code].balance += value;
                     
-                    printf("Valor de %.2f depositado com sucesso!\n", value);
+                    printf("Valor de R$ %.2f depositado com sucesso!\n", value);
                     printf("Saldo atual: R$ %.2f\n\n", accounts[log_status.account_code].balance);
+                    accounts[log_status.account_code].history[last_transaction].type = 'D';
+                    accounts[log_status.account_code].history[last_transaction].value = value;
+                    last_transaction += 1;
                     exiting();
                     return 1;
                     
@@ -414,20 +500,27 @@ int main (void) {
     setlocale (LC_ALL, "Portuguese");
     int option, exit_confirmation;
     
-    log_status.logged_in = false;
     unsigned int sleepDuration = 1;
+    
+    accounts = (struct Account*)malloc(MAX_ACCOUNTS * sizeof(struct Account));
+    if (accounts == NULL) {
+        printf("Erro: Falha na alocação de memória para o array de contas.\n");
+        return 1;
+    }
     
     printf ("Bem vindo(a) ao nosso banco!\n");
     printf ("Para começar, por favor escolha uma das opções abaixo\n");
     do {
         printf ("[1] Criar uma conta;\n[2] Realizar log-in;\n[3] Sair\n");
-        scanf ("%i", &option);
+        option = check_int("Sua opção: ", "Opção inválida. Por favor, digite um valor numérico.");
         printf ("\n\n");
         switch (option) {
             case 1:
                 if (num_accounts < 100) {
+                        system("clear");
                         printf ("Criando uma nova conta...\n\n");
                         sleep(sleepDuration);
+                        system("clear");
                         create_account();
                         
                     } else {
@@ -436,61 +529,86 @@ int main (void) {
                     }
                 break;
             case 2:
+                system("clear");
                 printf ("Iniciando log-in\n");
                 sleep(sleepDuration);
+                system("clear");
                 account_access();
                 break;
             case 3:
+                system("clear");
                 printf ("Saindo...");
-                return 0;
-                run = false;
+                exit(0);
                 break;
             default:
-                clear_terminal();
+                system("clear");
                 printf ("Opção inválida.\nPor favor, digite uma opção existente.\n\n");
                 break;
         }
     } while(!log_status.logged_in);
     
-    clear_terminal();
+    system("clear");
     
-    while(run) {
+    while(true) {
         printf("Por favor, escolha uma das opções abaixo:\n\n");
         print_main_menu();
         
-        scanf ("%i", &option);
+        option = check_int("Sua opção: ", "Opção inválida. Por favor, digite um valor numérico.");
         printf ("\n");
         
         switch (option) {
             case 1:
+                system("clear");
                 printf ("Criando uma nova conta\n");
                 sleep(sleepDuration);
+                system("clear");
                 create_account();
                 break;
             case 2:
+                system("clear");
                 printf ("Atualizando informações\n");
                 sleep(sleepDuration);
+                system("clear");
                 update_info();
                 break;
             case 3:
-                 printf ("Acessando transações\n");
-                 break;
+                 if (log_status.account_code != -1 && log_status.logged_in) {
+                    system("clear");
+                    printf ("Acessando o histórico de transações.\n");
+                    sleep(sleepDuration);
+                    system("clear");
+                    account_history();
+                } else {
+                    system("clear");
+                    printf("Você precisa realizar o login antes de acessar o histórico de transações.");
+                    sleep(sleepDuration);
+                    system("clear");
+                    account_access();
+                }
+                break;
             case 4:
+                system("clear");
                 printf ("Verificando detalhes de sua conta\n");
                 sleep(sleepDuration);
+                system("clear");
                 account_access();
                 break;
             case 5:
+                system("clear");
                 delete_account();
                 break;
             case 6:
                 if (log_status.account_code != -1 && log_status.logged_in) {
+                    system("clear");
                     printf ("Acessando área de saques e depósitos...\n");
                     sleep(sleepDuration);
+                    system("clear");
                     money_move();
                 } else {
+                    system("clear");
                     printf("Você precisa realizar o login antes de acessar a área de saques e depósitos.");
                     sleep(sleepDuration);
+                    system("clear");
                     account_access();
                 }
                 break;
@@ -500,16 +618,22 @@ int main (void) {
                 scanf ("%i", &exit_confirmation);
               
                 if (exit_confirmation == 1) {
-                    clear_terminal();
+                    system("clear");
                     printf ("Saindo...");
                     log_status.account_code = -1;
                     log_status.logged_in = false;
+                    
+                    for (int i = 0; i < num_accounts; i++) {
+                        free(accounts[i].history);
+                    }
+                    free(accounts);
+                    
                     exit(0);
                 }
               
                 break;
             default:
-                clear_terminal();
+                system("clear");
                 printf ("Opção inválida.\nPor favor, digite uma opção existente.\n\n");
                 break;
         }
