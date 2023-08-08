@@ -28,11 +28,12 @@ struct Account {
     bool active;
     struct Transactions history[MAX_HISTORY_ENTRIES];
     int history_capacity;
+    int last_transaction;
 };
 
 struct Login log_status;
 struct Account accounts[MAX_ACCOUNTS];
-int num_accounts = 0, last_transaction = 0;
+int num_accounts = 0;
 
 //***general purpose functions***//
 
@@ -69,6 +70,7 @@ void print_update_menu(void) {
     return;
 }
 
+
 //checking if an input received an integer-type data to avoid unexpected situations
 int check_int(const char *message, const char *error_message) {
     int var;
@@ -101,6 +103,7 @@ double check_double(const char *message, const char *error_message) {
 
 
 void exiting(void) {
+    printf("\n")
     printf("Deseja voltar ao menu principal?\n");
     printf("Digite [1] para voltar ao menu ou [2] para fechar o programa:\n");
     
@@ -197,6 +200,15 @@ void create_account(void) {
         accounts[num_accounts].active = true;
         accounts[num_accounts].history_capacity = MAX_HISTORY_ENTRIES;
         accounts[num_accounts].balance = balance;
+        accounts[num_accounts].last_transaction = 0;
+        accounts[num_accounts].history_capacity = MAX_HISTORY_ENTRIES;
+        accounts[num_accounts].last_transaction = 0;
+        
+        //clearing every element to avoid unexpected behaviors
+        for (int i = 0; i < MAX_HISTORY_ENTRIES; i++) {
+            accounts[num_accounts].history[i].type = '\0';
+            accounts[num_accounts].history[i].value = 0.0;
+        }
         
         system("clear");
         printf("Conta criada com sucesso!");
@@ -240,7 +252,7 @@ void update_info(void) {
                             fgets (accounts[account_code].name, sizeof(accounts[account_code].name), stdin);
                             printf("Nome alterado com sucesso!");
                             
-                            delete_new_line(accounts[num_accounts].name);
+                            delete_new_line(accounts[account_code].name);
                             
                             exiting();
                             return;
@@ -252,7 +264,7 @@ void update_info(void) {
                             fgets (accounts[account_code].last_name, sizeof(accounts[account_code].last_name), stdin);
                             printf("Sobrenome alterado com sucesso!");
                             
-                            delete_new_line(accounts[num_accounts].last_name);
+                            delete_new_line(accounts[account_code].last_name);
                             
                             exiting();
                             return;
@@ -333,17 +345,18 @@ bool account_access(void) {
 
 void account_history(void) {
     
-    for(int i = 0; i < MAX_HISTORY_ENTRIES; i++) {
-        //checking if the index isn't empty to ensure only relevant info will be displayed
-        if(accounts[log_status.account_code].history[i].type != '\0'){
+    for (int i = 0; i < accounts[log_status.account_code].history_capacity; i++) {
+        //checking if the transaction isn't empty to ensure only relevant info will be displayed
+        if (accounts[log_status.account_code].history[i].type != '\0') {
             printf("%i - ", i + 1);
             if (accounts[log_status.account_code].history[i].type == 'W') {
-                printf("Saque de %lf\n", accounts[log_status.account_code].history[i].value);
+                printf("Saque de %.2f\n", accounts[log_status.account_code].history[i].value);
             } else if (accounts[log_status.account_code].history[i].type == 'D') {
-                printf("Depósito de %lf\n", accounts[log_status.account_code].history[i].value);
+                printf("Depósito de %.2f\n", accounts[log_status.account_code].history[i].value);
             }
         }
     }
+
     printf("\n\n");
     exiting();
     return;
@@ -409,6 +422,7 @@ void money_move(void) {
     do {
         printf("Digite [1] para saques e [2] para depósitos.\n");
         option = check_int("Sua opção: ", "Opção inválida. Por favor, digite um valor numérico.");
+        
         switch (option) {
             
             //withdrawals' case
@@ -419,10 +433,14 @@ void money_move(void) {
                     accounts[log_status.account_code].balance -= value;
                     
                     printf("\n");
-                    printf("%lf retirado da sua conta, saldo atual: R$ %lf\n\n", value, accounts[log_status.account_code].balance);
-                    accounts[log_status.account_code].history[last_transaction].type = 'W';
-                    accounts[log_status.account_code].history[last_transaction].value = value;
-                    last_transaction += 1;
+                    printf("%.2f retirado da sua conta, saldo atual: R$ %.2f\n\n", value, accounts[log_status.account_code].balance);
+                    accounts[log_status.account_code].history[accounts[log_status.account_code].last_transaction].type = 'W';
+                    accounts[log_status.account_code].history[accounts[log_status.account_code].last_transaction].value = value;
+                    
+                    if(accounts[log_status.account_code].last_transaction < 10) {
+                        accounts[log_status.account_code].last_transaction += 1;
+                    }
+                    
                     exiting();
                     return;
                     
@@ -444,11 +462,15 @@ void money_move(void) {
                 if (value > 0) {
                     accounts[log_status.account_code].balance += value;
                     
-                    printf("Valor de R$ %lf depositado com sucesso!\n", value);
-                    printf("Saldo atual: R$ %lf\n\n", accounts[log_status.account_code].balance);
-                    accounts[log_status.account_code].history[last_transaction].type = 'D';
-                    accounts[log_status.account_code].history[last_transaction].value = value;
-                    last_transaction += 1;
+                    printf("Valor de R$ %.2f depositado com sucesso!\n", value);
+                    printf("Saldo atual: R$ %.2f\n\n", accounts[log_status.account_code].balance);
+                    accounts[log_status.account_code].history[accounts[log_status.account_code].last_transaction].type = 'D';
+                    accounts[log_status.account_code].history[accounts[log_status.account_code].last_transaction].value = value;
+                    
+                    if(accounts[log_status.account_code].last_transaction < 10) {
+                        accounts[log_status.account_code].last_transaction += 1;
+                    }
+                    
                     exiting();
                     return;
                     
@@ -565,7 +587,7 @@ void main (void) {
                 delete_account();
                 break;
             case 6:
-                if (log_status.account_code != -1 && log_status.logged_in) {
+                if (log_status.account_code > -1 && log_status.logged_in) {
                     system("clear");
                     printf ("Acessando área de saques e depósitos...\n");
                     sleep(sleepDuration);
