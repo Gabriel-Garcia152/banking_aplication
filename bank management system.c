@@ -103,7 +103,7 @@ double check_double(const char *message, const char *error_message) {
 
 
 void exiting(void) {
-    printf("\n")
+    printf("\n");
     printf("Deseja voltar ao menu principal?\n");
     printf("Digite [1] para voltar ao menu ou [2] para fechar o programa:\n");
     
@@ -144,7 +144,7 @@ bool password_validating(int account_code) {
             return true;
         } else {
             system("clear");
-            printf("Senha inválida, por favor tente novamente.");
+            printf("Senha inválida, por favor tente novamente.\n");
             printf("Tentativas feitas: %i\n", attempts);
             attempts += 1;
             printf("Tentativas restantes: %i\n", 3 - attempts);
@@ -250,6 +250,7 @@ void update_info(void) {
                             getchar();
                             printf("Qual nome você deseja colocar em sua conta?\n");
                             fgets (accounts[account_code].name, sizeof(accounts[account_code].name), stdin);
+                            system(clear);
                             printf("Nome alterado com sucesso!");
                             
                             delete_new_line(accounts[account_code].name);
@@ -262,6 +263,7 @@ void update_info(void) {
                             char last_name[STRING_LIMIT_SIZE];
                             getchar();
                             fgets (accounts[account_code].last_name, sizeof(accounts[account_code].last_name), stdin);
+                            system(clear);
                             printf("Sobrenome alterado com sucesso!");
                             
                             delete_new_line(accounts[account_code].last_name);
@@ -273,6 +275,7 @@ void update_info(void) {
                             printf("Qual senha você deseja colocar em sua conta?\n");
                             char *password = getpass("");
                             strcpy(accounts[account_code].password, password);
+                            system(clear);
                             printf("Senha alterada com sucesso!");
                             exiting();
                             return;
