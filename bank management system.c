@@ -387,7 +387,7 @@ void delete_account(void) {
                 if(option == 1) {
                     
                     system("clear");
-                    printf("Para confirmar a exclusão, for favor, digite sua senha: ");
+                    printf("Para confirmar a exclusão");
                     
                     if(password_validating(account_code)) {
                         accounts[account_code].active = false;
