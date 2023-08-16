@@ -250,7 +250,7 @@ void update_info(void) {
                             getchar();
                             printf("Qual nome você deseja colocar em sua conta?\n");
                             fgets (accounts[account_code].name, sizeof(accounts[account_code].name), stdin);
-                            system(clear);
+                            system("clear");
                             printf("Nome alterado com sucesso!");
                             
                             delete_new_line(accounts[account_code].name);
@@ -263,7 +263,7 @@ void update_info(void) {
                             char last_name[STRING_LIMIT_SIZE];
                             getchar();
                             fgets (accounts[account_code].last_name, sizeof(accounts[account_code].last_name), stdin);
-                            system(clear);
+                            system("clear");
                             printf("Sobrenome alterado com sucesso!");
                             
                             delete_new_line(accounts[account_code].last_name);
@@ -275,7 +275,7 @@ void update_info(void) {
                             printf("Qual senha você deseja colocar em sua conta?\n");
                             char *password = getpass("");
                             strcpy(accounts[account_code].password, password);
-                            system(clear);
+                            system("clear");
                             printf("Senha alterada com sucesso!");
                             exiting();
                             return;
@@ -309,8 +309,9 @@ bool account_access(void) {
         if (accounts[account_code].active) {
             printf("Bem vindo(a) %s %s!\n", accounts[account_code].name, accounts[account_code].last_name);
             if (account_code != log_status.account_code || log_status.logged_in == false) {
-                printf("Para acessar sua conta, por favor digite sua senha: ");
+                printf("Para acessar sua conta");
                 
+                //printing account's info if password match
                 if (password_validating(account_code)) {
                     
                     print_account(account_code);
