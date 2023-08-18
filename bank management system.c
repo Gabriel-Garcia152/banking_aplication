@@ -68,6 +68,8 @@ void initialize_account(int code) {
     accounts[code].last_transaction = 0;
     accounts[code].history_capacity = MAX_HISTORY_ENTRIES;
     accounts[code].last_transaction = 0;
+
+    return;
 }
 
 void print_update_menu(void) {
