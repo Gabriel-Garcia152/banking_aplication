@@ -60,6 +60,15 @@ void print_main_menu(void) {
     return;
 }
 
+void initialize_account(int code) {
+    accounts[num_accounts].active = true;
+    accounts[num_accounts].history_capacity = MAX_HISTORY_ENTRIES;
+    accounts[num_accounts].balance = 0.0;
+    accounts[num_accounts].last_transaction = 0;
+    accounts[num_accounts].history_capacity = MAX_HISTORY_ENTRIES;
+    accounts[num_accounts].last_transaction = 0;
+}
+
 void print_update_menu(void) {
     printf("Qual informação você deseja atualizar?\n");
     printf("[1] - Nome\n");
@@ -167,7 +176,6 @@ void delete_new_line(char *var) {
 //***main menu functions***//
 
 void create_account(void) {
-    double balance = 0.0;
     
     //storing name and last_name properly and ensuring it won't surpass the limit size for stings
     printf ("Digite seu nome: ");
@@ -197,12 +205,7 @@ void create_account(void) {
             confirm = getpass("");
         }
         
-        accounts[num_accounts].active = true;
-        accounts[num_accounts].history_capacity = MAX_HISTORY_ENTRIES;
-        accounts[num_accounts].balance = balance;
-        accounts[num_accounts].last_transaction = 0;
-        accounts[num_accounts].history_capacity = MAX_HISTORY_ENTRIES;
-        accounts[num_accounts].last_transaction = 0;
+        initialize_account(num_accounts);
         
         //clearing every element to avoid unexpected behaviors
         for (int i = 0; i < MAX_HISTORY_ENTRIES; i++) {
