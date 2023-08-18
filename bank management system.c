@@ -60,13 +60,14 @@ void print_main_menu(void) {
     return;
 }
 
+//initiating new accounts during creation process
 void initialize_account(int code) {
-    accounts[num_accounts].active = true;
-    accounts[num_accounts].history_capacity = MAX_HISTORY_ENTRIES;
-    accounts[num_accounts].balance = 0.0;
-    accounts[num_accounts].last_transaction = 0;
-    accounts[num_accounts].history_capacity = MAX_HISTORY_ENTRIES;
-    accounts[num_accounts].last_transaction = 0;
+    accounts[code].active = true;
+    accounts[code].history_capacity = MAX_HISTORY_ENTRIES;
+    accounts[code].balance = 0.0;
+    accounts[code].last_transaction = 0;
+    accounts[code].history_capacity = MAX_HISTORY_ENTRIES;
+    accounts[code].last_transaction = 0;
 }
 
 void print_update_menu(void) {
